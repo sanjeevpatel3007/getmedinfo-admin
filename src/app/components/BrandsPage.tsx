@@ -17,6 +17,7 @@ export default function BrandsPage() {
     fetchBrands();
   }, []);
 
+
   // Function to fetch all brands
   const fetchBrands = async () => {
     setLoading(true);
@@ -31,6 +32,7 @@ export default function BrandsPage() {
       setLoading(false);
     }
   };
+
 
   // Handle brand creation
   const handleCreateBrand = async (brandData: any) => {
