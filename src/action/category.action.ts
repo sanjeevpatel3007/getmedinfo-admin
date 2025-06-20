@@ -14,37 +14,41 @@ export type Category = {
   id: string;
   name: string;
   description: string | null;
+  medicine_count: number;
 };
 
-// Get all categories
+type MedicineCount = {
+  category_id: string;
+  count: string;
+};
+
+// Get all categories with medicine count
 export async function getCategories(): Promise<CategoryResponse> {
   try {
+    // Get categories with medicine counts using a join
     const { data, error } = await supabase
       .from('categories')
-      .select('*')
-      .order('name', { ascending: true });
+      .select(`
+        *,
+        medicines:medicines(count)
+      `);
 
-    if (error) {
-      return {
-        error: {
-          message: error.message,
-          status: 400,
-        },
-        data: null,
-      };
-    }
+    if (error) throw error;
+
+    // Transform the data to include medicine count
+    const categoriesWithCount = data.map(category => ({
+      ...category,
+      medicine_count: category.medicines[0]?.count || 0
+    }));
 
     return {
-      error: null,
-      data,
+      data: categoriesWithCount,
+      error: null
     };
-  } catch (error) {
+  } catch (error: any) {
     return {
-      error: {
-        message: 'An unexpected error occurred',
-        status: 500,
-      },
-      data: null,
+      error: { message: error.message, status: 500 },
+      data: null
     };
   }
 }
@@ -89,30 +93,16 @@ export async function createCategory(name: string, description: string | null): 
     const { data, error } = await supabase
       .from('categories')
       .insert([{ name, description }])
-      .select()
+      .select('*')
       .single();
 
-    if (error) {
-      return {
-        error: {
-          message: error.message,
-          status: 400,
-        },
-        data: null,
-      };
-    }
+    if (error) throw error;
 
+    return { data: { ...data, medicine_count: 0 }, error: null };
+  } catch (error: any) {
     return {
-      error: null,
-      data,
-    };
-  } catch (error) {
-    return {
-      error: {
-        message: 'An unexpected error occurred',
-        status: 500,
-      },
-      data: null,
+      error: { message: error.message, status: 500 },
+      data: null
     };
   }
 }
@@ -124,30 +114,25 @@ export async function updateCategory(id: string, name: string, description: stri
       .from('categories')
       .update({ name, description })
       .eq('id', id)
-      .select()
+      .select(`
+        *,
+        medicines:medicines(count)
+      `)
       .single();
 
-    if (error) {
-      return {
-        error: {
-          message: error.message,
-          status: 400,
-        },
-        data: null,
-      };
-    }
+    if (error) throw error;
 
     return {
-      error: null,
-      data,
-    };
-  } catch (error) {
-    return {
-      error: {
-        message: 'An unexpected error occurred',
-        status: 500,
+      data: {
+        ...data,
+        medicine_count: data.medicines[0]?.count || 0
       },
-      data: null,
+      error: null
+    };
+  } catch (error: any) {
+    return {
+      error: { message: error.message, status: 500 },
+      data: null
     };
   }
 }
@@ -155,32 +140,18 @@ export async function updateCategory(id: string, name: string, description: stri
 // Delete a category
 export async function deleteCategory(id: string): Promise<CategoryResponse> {
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('categories')
       .delete()
       .eq('id', id);
 
-    if (error) {
-      return {
-        error: {
-          message: error.message,
-          status: 400,
-        },
-        data: null,
-      };
-    }
+    if (error) throw error;
 
+    return { error: null, data: true };
+  } catch (error: any) {
     return {
-      error: null,
-      data: true,
-    };
-  } catch (error) {
-    return {
-      error: {
-        message: 'An unexpected error occurred',
-        status: 500,
-      },
-      data: null,
+      error: { message: error.message, status: 500 },
+      data: null
     };
   }
 }

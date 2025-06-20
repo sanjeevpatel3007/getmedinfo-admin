@@ -7,27 +7,44 @@ import { v4 as uuidv4 } from 'uuid';
 export type Brand = {
   id: string;
   name: string;
+  description: string | null;
+  logo_url: string | null;
   country: string | null;
   logo: string | null;
+  medicine_count: number;
 };
 
-export type BrandInput = Omit<Brand, 'id'> & { logoFile?: File };
+// Simplified BrandInput to match form fields exactly
+export type BrandInput = {
+  name: string;
+  country: string | null;
+  logo: string | null;
+  logoFile?: File;
+};
 
 // Fetch all brands
 export async function getBrands(): Promise<Brand[]> {
   try {
     const { data, error } = await supabase
       .from('brands')
-      .select('*')
-      .order('name');
+      .select(`
+        *,
+        medicines:medicines(count)
+      `);
 
     if (error) {
       console.error('Error fetching brands:', error);
       throw new Error(error.message);
     }
 
-    return data || [];
-  } catch (error) {
+    // Transform the data to include medicine count
+    const brandsWithCount = data.map(brand => ({
+      ...brand,
+      medicine_count: brand.medicines[0]?.count || 0
+    }));
+
+    return brandsWithCount;
+  } catch (error: any) {
     console.error('Error in getBrands:', error);
     throw error;
   }
@@ -79,89 +96,54 @@ async function uploadLogo(file: File): Promise<string> {
 }
 
 // Create a new brand
-export async function createBrand(brandData: BrandInput): Promise<Brand> {
+export async function createBrand({ name, country, logo, logoFile }: BrandInput): Promise<Brand> {
   try {
-    let logoUrl = brandData.logo;
-
-    // Upload logo if provided
-    if (brandData.logoFile) {
-      logoUrl = await uploadLogo(brandData.logoFile);
-    }
-
-    const newBrand = {
-      name: brandData.name,
-      country: brandData.country,
-      logo: logoUrl,
-    };
-
     const { data, error } = await supabase
       .from('brands')
-      .insert([newBrand])
-      .select()
+      .insert([{ 
+        name, 
+        country, 
+        logo,
+        description: null,  // Set default values for optional fields
+        logo_url: null
+      }])
+      .select('*')
       .single();
 
-    if (error) {
-      console.error('Error creating brand:', error);
-      throw new Error(error.message);
-    }
+    if (error) throw error;
 
-    return data;
-  } catch (error) {
+    return { ...data, medicine_count: 0 };
+  } catch (error: any) {
     console.error('Error in createBrand:', error);
     throw error;
   }
 }
 
 // Update an existing brand
-export async function updateBrand(id: string, brandData: BrandInput): Promise<Brand> {
+export async function updateBrand(id: string, { name, country, logo, logoFile }: BrandInput): Promise<Brand> {
   try {
-    // First check if the brand exists
-    const { data: existingBrand, error: checkError } = await supabase
-      .from('brands')
-      .select()
-      .eq('id', id)
-      .maybeSingle();
-
-    if (checkError) {
-      console.error('Error checking brand existence:', checkError);
-      throw new Error(checkError.message);
-    }
-
-    if (!existingBrand) {
-      throw new Error(`Brand with ID ${id} not found`);
-    }
-
-    let logoUrl = brandData.logo;
-
-    // Upload logo if provided
-    if (brandData.logoFile) {
-      logoUrl = await uploadLogo(brandData.logoFile);
-    }
-
-    const updatedBrand = {
-      name: brandData.name,
-      country: brandData.country,
-      logo: logoUrl,
-    };
-
     const { data, error } = await supabase
       .from('brands')
-      .update(updatedBrand)
+      .update({ 
+        name, 
+        country, 
+        logo,
+        // Keep existing values for description and logo_url
+      })
       .eq('id', id)
-      .select()
-      .maybeSingle();
+      .select(`
+        *,
+        medicines:medicines(count)
+      `)
+      .single();
 
-    if (error) {
-      console.error('Error updating brand:', error);
-      throw new Error(error.message);
-    }
+    if (error) throw error;
 
-    if (!data) {
-      throw new Error('Brand was not updated successfully');
-    }
-
-    return data;
-  } catch (error) {
+    return {
+      ...data,
+      medicine_count: data.medicines[0]?.count || 0
+    };
+  } catch (error: any) {
     console.error('Error in updateBrand:', error);
     throw error;
   }
@@ -198,7 +180,7 @@ export async function deleteBrand(id: string): Promise<void> {
         // Don't throw here, as the brand is already deleted
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in deleteBrand:', error);
     throw error;
   }

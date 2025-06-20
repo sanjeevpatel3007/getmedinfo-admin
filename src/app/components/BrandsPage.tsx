@@ -92,9 +92,7 @@ export default function BrandsPage() {
   return (
     <div className="bg-white p-6 rounded-lg shadow">
       <h2 className="text-xl font-semibold mb-4">Brands Management</h2>
-      <p className="text-gray-700 mb-4">
-        Manage all medicine brands in the GetMedInfo database. Add, edit, or remove brand information.
-      </p>
+      
 
       {/* Form or List View */}
       {showForm ? (
